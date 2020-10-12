@@ -1,0 +1,74 @@
+import json
+import boto3
+import os
+import csv
+import codecs
+import sys
+import uuid
+
+print ('Number of arguments:', len(sys.argv), 'arguments.')
+print ('Argument List:', str(sys.argv))
+
+region_name_arg=sys.argv[4]
+print ('Default Regions is '+region_name_arg)
+s3 = boto3.resource('s3',region_name=region_name_arg)
+dynamodb = boto3.resource('dynamodb',region_name=region_name_arg)
+bucket = sys.argv[1]
+key = sys.argv[2]
+table_name = sys.argv[3]
+print('Args parameters mapped as File:{} from S3:{} and putting data to {}'.format(key,bucket,table_name))
+
+def lambda_handler(event, context):
+    print('Not yet Implemented')
+def save_csv_to_dynamo(bucket,key,table_name):
+    # get() does not store in memory
+    print('Pulling File:{} from S3{} and putting data to {}'.format(key,bucket,table_name))
+    try:
+        obj = s3.Object(bucket, key).get()['Body']
+    except Exception as e:
+        print("S3 Object could not be opened. Check environment variable. " + e)
+    try:
+        table = dynamodb.Table(table_name)
+    except Exception as e:
+        print("Error loading DynamoDB table. Check if table was created correctly and environment variable." + e)
+
+    batch_size = 100
+    batch = []
+
+    # DictReader is a generator; not stored in memory
+    for row in csv.DictReader(codecs.getreader('utf-8')(obj)):
+        if len(batch) >= batch_size:
+            write_to_dynamo(batch)
+            print('Loaded row {}'.format(batch))
+            batch.clear()
+        row['id']=str(uuid.uuid4())
+        batch.append(row)
+    if batch:
+        write_to_dynamo(batch)
+        print('Loaded row {}'.format(batch))
+    return {
+        'statusCode': 200,
+        'body': json.dumps('Uploaded to DynamoDB Table')
+        }
+
+
+def write_to_dynamo(rows):
+    table_name = 'channelwarranty.links'
+    try:
+        table = dynamodb.Table(table_name)
+    except Exception as e:
+        print("Error loading DynamoDB table. Check if table was created correctly and environment variable. ,Message:{}, Type:{}, Args:{}".format(e,type(e),e.args))
+        
+    try:
+        with table.batch_writer() as batch:
+            for i in range(len(rows)):
+                batch.put_item(Item=rows[i])
+    except Exception as e:
+        print("Error executing batch_writer" + e)
+
+if __name__ == '__main__':
+    print('Start Main')
+    save_csv_to_dynamo(bucket,key,table_name)
+    print('End Main')
+else:
+    print('Inside the else for main.')
