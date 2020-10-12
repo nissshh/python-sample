@@ -5,17 +5,35 @@ import csv
 import codecs
 import sys
 import uuid
+import getopt
 
 print ('Number of arguments:', len(sys.argv), 'arguments.')
 print ('Argument List:', str(sys.argv))
+USAGE = f"Usage: python {sys.argv[0]} [--bucket=<bucketname>| -b <bucketname>]  [--key=<filename> | -k <filename>] [--tablename=<filename> | -t <filename>]"
 
-region_name_arg=sys.argv[4]
+bucket = ''
+key = ''
+table_name = ''
+region_name_arg=''
+
+options, arguments = getopt.getopt(sys.argv[1:],'b:k:t:r:',["bucket=", "key=", "tablename=","region="])
+print(options)
+for o,v in options:
+    if(o in('-b','--bucket')):
+        bucket = v
+    elif(o in('-k','--key')):
+        key = v
+    elif(o in('-t','--tablename')):
+        table_name = v
+    elif(o in('-r','--region')):
+        region_name_arg = v
+    else:
+        raise SystemExit(USAGE)
+print('Args parameters mapped as File:{} from S3:{} and putting data to {} with region {}'.format(key,bucket,table_name,region_name_arg))
 print ('Default Regions is '+region_name_arg)
 s3 = boto3.resource('s3',region_name=region_name_arg)
 dynamodb = boto3.resource('dynamodb',region_name=region_name_arg)
-bucket = sys.argv[1]
-key = sys.argv[2]
-table_name = sys.argv[3]
+
 print('Args parameters mapped as File:{} from S3:{} and putting data to {}'.format(key,bucket,table_name))
 
 def lambda_handler(event, context):
@@ -28,7 +46,7 @@ def save_csv_to_dynamo(bucket,key,table_name):
     except Exception as e:
         print("S3 Object could not be opened. Check environment variable. " + e)
     try:
-        table = dynamodb.Table(table_name)
+        dynamodb.Table(table_name)
     except Exception as e:
         print("Error loading DynamoDB table. Check if table was created correctly and environment variable." + e)
 
@@ -68,7 +86,7 @@ def write_to_dynamo(rows):
 
 if __name__ == '__main__':
     print('Start Main')
-    save_csv_to_dynamo(bucket,key,table_name)
+    #save_csv_to_dynamo(bucket,key,table_name)
     print('End Main')
 else:
     print('Inside the else for main.')
